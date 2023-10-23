@@ -9,6 +9,7 @@ import { Webhook, MessageBuilder } from "discord-webhook-node";
 
 import express from "express";
 import bodyParser from "body-parser";
+import { productLinks } from "./productURL.js"
   
 // New app using express module
 const app = express();
@@ -39,7 +40,7 @@ async function Monitor(productLink) {
         headers: myHeaders
     });
     const myEmitter = new EventEmitter();
-    myEmitter.setMaxListeners(10);
+    myEmitter.setMaxListeners(20);
 
     try {
         if (response && response.statusCode === 200) {
@@ -74,26 +75,32 @@ async function Monitor(productLink) {
                 const savingsPercentage = root.querySelector('.a-size-large.a-color-price.savingPriceOverride.aok-align-center.reinventPriceSavingsPercentageMargin.savingsPercentage');
                 if (priceElement && savingsPercentage) {
                     const price = priceElement.innerText;
-                    const savings = savingsPercentage.innerText;
+                    const savings = savingsPercentage.textContent;
                     console.log('Price:', price);
-                    console.log('Savings Percentage:', savingsPercentage);
+                    console.log('Savings Percentage:', savings);
 
-                    // Create a Discord webhook and send a message
-                    const hook = new Webhook('https://discord.com/api/webhooks/1165364956817002576/RIvWdsPAZ-fjuxIKPIG07emeznYuCHKLb0LW4pfdmtg5vc5H-n0RCh6jBZ-wdbuOundF');
-                    const embed = new MessageBuilder()
-                        .setAuthor('Amazon Monitor', 'https://upload.wikimedia.org/wikipedia/commons/d/de/Amazon_icon.png')
-                        .setColor('#90ee90')
-                        .setTimestamp()
-                        .setThumbnail(landingImageElement?.getAttribute('src'))
-                        .addField(productName || 'Product Name Not Found', productLink, true)
-                        .addField('Availability', 'IN STOCK', false)
-                        .addField('SKU', sku || 'SKU Not Found', true)
-                        .addField('Offer ID', availabilityDiv)
-                        .addField('Price', price)
-                        .addField('Saving Percentage', savings);
+                    //parseFloat(savings.replace('%', ''));
+                    //console.log("checking code", parseFloat(savings.replace('%', '')));
+                    //if (savings.replace('%', '') > 5 && !notificationSent) {
+                      //  console.log("is below 50%", savings.replace('%', ''))
+                        // Create a Discord webhook and send a message
+                        const hook = new Webhook('https://discord.com/api/webhooks/1165364956817002576/RIvWdsPAZ-fjuxIKPIG07emeznYuCHKLb0LW4pfdmtg5vc5H-n0RCh6jBZ-wdbuOundF');
+                        const embed = new MessageBuilder()
+                            .setAuthor('Amazon Monitor', 'https://upload.wikimedia.org/wikipedia/commons/d/de/Amazon_icon.png')
+                            .setColor('#90ee90')
+                            .setTimestamp()
+                            .setThumbnail(landingImageElement?.getAttribute('src'))
+                            .addField(productName || 'Product Name Not Found', productLink, true)
+                            .addField('Availability', 'IN STOCK', false)
+                            .addField('SKU', sku || 'SKU Not Found', true)
+                            .addField('Offer ID', availabilityDiv)
+                            .addField('Price', price)
+                            .addField('Saving Percentage', savings);
 
-                    await hook.send(embed);
-                    console.log(productName + ': IN STOCK');
+                        await hook.send(embed);
+                        console.log(productName + ': IN STOCK');
+                        //notificationSent = true; 
+                    //}
                 } else {
                     console.log('Price element not found.');
                 }
@@ -105,11 +112,24 @@ async function Monitor(productLink) {
         console.error('Error while scraping:', error);
     }
     
-    await new Promise(r => setTimeout(r,8000));
-    Monitor(productLink);
-    return false;
+    //await new Promise(r => setTimeout(r,8000));
+    return new Promise((resolve) => {
+        setTimeout(resolve, 200000);
+        Monitor(productLink);
+        return false;
+    });
 }
 
+try {
+    const monitorPromises = productLinks.map(link => Monitor(link));
+    await Promise.all(monitorPromises);
+    console.log('All products monitored.');
+} catch (err) {
+    console.error('Error:', err);
+}
+
+// below method is also we can use as monitor amazon product 
+/*
 async function Run() {
     const productLinks = prompt("Enter links to monitor (separated by commas): ");
     const productLinksArr = productLinks.split(',').map(productLink => productLink.trim());
@@ -123,3 +143,5 @@ async function Run() {
 }
 
 Run();
+*/
+
