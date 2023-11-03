@@ -2,20 +2,47 @@ import got from "got";
 import HTMLParser from "node-html-parser";
 import promptSync from "prompt-sync";
 const prompt = promptSync();
-import puppeteer from "puppeteer";
+import puppeteer from 'puppeteer';
 import EventEmitter from "events";
+import fs from 'fs';
+import moment from 'moment';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import cron from 'node-cron';
+import util from 'util'; // Import the 'util' module
+
+import path from 'path'; // Import the 'path' module
 
 import { Webhook, MessageBuilder } from "discord-webhook-node";
 
 import express from "express";
 import bodyParser from "body-parser";
-import { productLinks } from "./productURL.js"
+import { productLinks , lastNotificationTimes, notificationCooldown} from "./productURL.js"
   
 // New app using express module
 const app = express();
 app.use(bodyParser.urlencoded({
     extended:true
 }));
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const logFileName = 'script.log'; 
+
+// Use 'path' module for log directory
+const logDirectory = path.join(__dirname, 'logs');
+
+// Create the log directory if it doesn't exist
+if (!fs.existsSync(logDirectory)) {
+    fs.mkdirSync(logDirectory, { recursive: true });
+}
+
+// Create a log file stream (append mode)
+const logStream = fs.createWriteStream(path.join(logDirectory, logFileName), { flags: 'a' })
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
 
 async function Monitor(productLink) {
     var myHeaders = {
@@ -79,11 +106,10 @@ async function Monitor(productLink) {
                     console.log('Price:', price);
                     console.log('Savings Percentage:', savings);
 
-                    //parseFloat(savings.replace('%', ''));
-                    //console.log("checking code", parseFloat(savings.replace('%', '')));
-                    //if (savings.replace('%', '') > 5 && !notificationSent) {
-                      //  console.log("is below 50%", savings.replace('%', ''))
-                        // Create a Discord webhook and send a message
+                    const currentTime = Date.now();
+                    const lastNotificationTime = lastNotificationTimes[productLink] || 0;
+                    if(currentTime - lastNotificationTime >= notificationCooldown) {
+                        console.log("checking time", notificationCooldown);
                         const hook = new Webhook('https://discord.com/api/webhooks/1165364956817002576/RIvWdsPAZ-fjuxIKPIG07emeznYuCHKLb0LW4pfdmtg5vc5H-n0RCh6jBZ-wdbuOundF');
                         const embed = new MessageBuilder()
                             .setAuthor('Amazon Monitor', 'https://upload.wikimedia.org/wikipedia/commons/d/de/Amazon_icon.png')
@@ -99,8 +125,13 @@ async function Monitor(productLink) {
 
                         await hook.send(embed);
                         console.log(productName + ': IN STOCK');
-                        //notificationSent = true; 
-                    //}
+
+                        console.log('Notification sent', productLinks);
+                        // Update the last notification time to the current time
+                        lastNotificationTimes[productLinks] = currentTime;
+                        console.log("last notification", lastNotificationTimes);
+                        console.log("checking here", lastNotificationTimes[productLinks] = currentTime);
+                    }
                 } else {
                     console.log('Price element not found.');
                 }
@@ -111,37 +142,63 @@ async function Monitor(productLink) {
     } catch (error) {
         console.error('Error while scraping:', error);
     }
-    
-    //await new Promise(r => setTimeout(r,8000));
-    return new Promise((resolve) => {
-        setTimeout(resolve, 200000);
-        Monitor(productLink);
-        return false;
-    });
 }
 
-try {
-    const monitorPromises = productLinks.map(link => Monitor(link));
+// Start monitoring for all product links
+const monitorPromises = productLinks.map(link => Monitor(link));
+console.log('Monitoring', productLinks.map(link => Monitor(link)));
+
+async function monitorProductURLs() {
+    for (const productLink of productLinks) {
+        await Monitor(productLink);
+        // await Promise.all(monitorPromises);
+        // console.log('Monitoring completed');
+    }
     await Promise.all(monitorPromises);
-    console.log('All products monitored.');
-} catch (err) {
-    console.error('Error:', err);
+    console.log('Monitoring completed');
 }
 
-// below method is also we can use as monitor amazon product 
-/*
-async function Run() {
-    const productLinks = prompt("Enter links to monitor (separated by commas): ");
-    const productLinksArr = productLinks.split(',').map(productLink => productLink.trim());
+cron.schedule('0 * * * *', async () => {
+    console.log('Monitoring started');
+    try {
+        await monitorProductURLs();
+    } catch (error) {
+        console.error('Error during monitoring:', error);
+    }
+    console.log('Monitoring completed');
+}, {
+    scheduled: true,
+    timezone: 'America/New_York'
+});
 
-    console.log(productLinksArr);
+// try {
+//     const monitorPromises = productLinks.map(link => Monitor(link));
+//     await Promise.all(monitorPromises);
+//     console.log('All products monitored.');
+// } catch (err) {
+//     console.error('Error:', err);
+// }
 
-    console.log(`Now monitoring ${productLinksArr.length} items`);
-
-    const monitors = productLinksArr.map(link => Monitor(link));
-    await Promise.allSettled(monitors);
+console.log = function () {
+    process.stdout.write(util.format.apply(null, arguments) + '\n');
+    logStream.write(util.format.apply(null, arguments) + '\n');
 }
 
-Run();
-*/
+console.error = function () {
+    process.stderr.write(util.format.apply(null, arguments) + '\n');
+    logStream.write(util.format.apply(null, arguments) + '\n');
+}
+
+
+// Defining the log direcotry and llog file
+const currentDate = moment().format('YYYY-MM-DD');
+const logFile = path.join(logDirectory, `script-${currentDate}.log`);
+
+// // Your script's code here
+// console.log('Starting your Node.js script...');
+
+// // Example log entries
+// console.log('This is a log message.');
+// console.error('This is an error message.');
+
 
