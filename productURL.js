@@ -20,10 +20,21 @@ export const productLinks = [
     'https://www.amazon.com/Legend-Tape-Wrapping-Electric-Insulation/dp/B09PFDZNPD/ref=sr_1_5?crid=2247KV4YRRHUW&keywords=cricket+tennis+ball+tape&qid=1699025263&sprefix=cricket+tennis+ball+%2Caps%2C91&sr=8-5',
     'https://www.amazon.com/Kasa-Smart-Power-Strip-TP-Link/dp/B07G95FFN3/?_encoding=UTF8&pd_rd_w=xlGAc&content-id=amzn1.sym.f6bda9ac-9bd5-4e15-b4b3-6b64b293ab2e&pf_rd_p=f6bda9ac-9bd5-4e15-b4b3-6b64b293ab2e&pf_rd_r=P46ZA34ZPQQ5PAFVP0WA&pd_rd_wg=uvJH9&pd_rd_r=a09901e9-7395-40ac-93e8-308df9c702c3&ref_=pd_gw_trq_ed_38o1v5ao',
     'https://www.amazon.com/Kasa-Smart-Changing-Dimmable-Compatible/dp/B08TB8Z5HF/?_encoding=UTF8&pd_rd_w=jxRr6&content-id=amzn1.sym.03bef33a-a357-4fe3-9505-7fd4d6236957%3Aamzn1.symc.8b620bc3-61d8-46b3-abd9-110539785634&pf_rd_p=03bef33a-a357-4fe3-9505-7fd4d6236957&pf_rd_r=E6AZ0H7PFJFAG2GCAZA7&pd_rd_wg=wktvY&pd_rd_r=ccbc344a-6ff8-4da2-9fcc-752a6e3ac3ef&ref_=pd_gw_ci_mcx_mr_hp_d',
-    'https://www.amazon.com/Retainer-Brite-Months-Supply-Tablets/dp/B06Y6L14CB/ref=sr_1_7?keywords=Retainer+Brite+Tablets+for+Cleaner+Retainers+and+Dental+Appliances+-+96+Count&qid=1699025900&sr=8-7'
+    'https://www.amazon.com/Retainer-Brite-Months-Supply-Tablets/dp/B06Y6L14CB/ref=sr_1_7?keywords=Retainer+Brite+Tablets+for+Cleaner+Retainers+and+Dental+Appliances+-+96+Count&qid=1699025900&sr=8-7',
+    'https://www.amazon.com/Apple-iPhone-128GB-Deep-Purple/dp/B0BYM3SD4K/ref=sr_1_2?keywords=iphone%2B14%2Bpro%2Bmax&qid=1699063298&sr=8-2&th=1',
+    'https://www.amazon.com/Certified-iPhone-Charger-Charging-Lightning/dp/B09ZK33WST/ref=sr_1_11?crid=YPSWT952BQYF&keywords=iphone+14+pro+max+new&qid=1699063339&sprefix=iphone+14+pro+max+new%2Caps%2C100&sr=8-11',
+    'https://www.amazon.com/iPhone-13-Pro-256GB-Graphite/dp/B0BGYBX3LK/ref=sr_1_15?crid=YPSWT952BQYF&keywords=iphone+14+pro+max+new&qid=1699063362&sprefix=iphone+14+pro+max+new%2Caps%2C100&sr=8-15',
+    'https://www.amazon.com/Pack-Apple-Lightning-Headphones-Microphone-Compatible/dp/B0CGZG12GZ/ref=sr_1_19?crid=YPSWT952BQYF&keywords=iphone+14+pro+max+new&qid=1699063362&sprefix=iphone+14+pro+max+new%2Caps%2C100&sr=8-19',
+    'https://www.amazon.com/dp/B0BBDZHM3Y/ref=sspa_dk_detail_5?psc=1&pd_rd_i=B0BBDZHM3Y&pd_rd_w=pzC1h&content-id=amzn1.sym.d81b167d-1f9e-48b6-87d8-8aa5e473ea8c&pf_rd_p=d81b167d-1f9e-48b6-87d8-8aa5e473ea8c&pf_rd_r=FQ3J6Q7FQ6MBP010Q0EZ&pd_rd_wg=vrWjK&pd_rd_r=1744a8e3-ab0b-4bbe-badf-b64e03dbe163&s=electronics&sp_csd=d2lkZ2V0TmFtZT1zcF9kZXRhaWxfdGhlbWF0aWM&spLa=ZW5jcnlwdGVkUXVhbGlmaWVyPUEyVEZWMDdDMFgyQTZYJmVuY3J5cHRlZElkPUEwNzcwNjI5M0syUlNON1UzU1dUVyZlbmNyeXB0ZWRBZElkPUEwMTIxNTc3MUNGMTI2Q01HRVU2TiZ3aWRnZXROYW1lPXNwX2RldGFpbF90aGVtYXRpYyZhY3Rpb249Y2xpY2tSZWRpcmVjdCZkb05vdExvZ0NsaWNrPXRydWU=',
+    'https://www.amazon.com/Apple-12-9-inch-iPad-Pro-Wi-Fi-256GB/dp/B0BJLFC67L/ref=sr_1_5?crid=1YMAC6TGJZ33Y&keywords=ipad+pro+new&qid=1699063438&s=electronics&sprefix=ipad+pro+new%2Celectronics%2C97&sr=1-5&ufe=app_do%3Aamzn1.fos.765d4786-5719-48b9-b588-eab9385652d5',
+    'https://www.amazon.com/dp/B09V3JJT5D/ref=fs_a_ipt2_us2',
+    'https://www.amazon.com/dp/B09G91LXFP/ref=fs_a_ipt2_us5',
+    'https://www.amazon.com/Titan-Karishma-Analog-Black-Watch/dp/B008OVTD6O/ref=sr_1_3?crid=1UUVZGC0HWO3L&keywords=titan+square+watch+men&qid=1699063492&sprefix=titan+square+watch+men%2Caps%2C188&sr=8-3',
+    'https://www.amazon.com/Citizen-Mens-Quartz-Watch-BH1678-56E/dp/B00UU6VDAK/ref=sr_1_16?crid=1UUVZGC0HWO3L&keywords=titan+square+watch+men&qid=1699063519&sprefix=titan+square+watch+men%2Caps%2C188&sr=8-16',
+    'https://www.amazon.com/Bulova-Quartz-Stainless-Steel-Dress/dp/B010B8RCKG/ref=sr_1_32?crid=1UUVZGC0HWO3L&keywords=titan+square+watch+men&qid=1699063519&sprefix=titan+square+watch+men%2Caps%2C188&sr=8-32'
     // Add more product URLs here
 ];
 
 //export const notificationCooldown = 3600 * 1000; // 1 hour in milliseconds
-export const notificationCooldown = 1800000; 
+export const notificationCooldown = 1000; 
 export const lastNotificationTimes = {};

@@ -101,6 +101,13 @@ async function Monitor(productLink) {
                 // Extract Saving Percentage
                 const savingsPercentage = root.querySelector('.a-size-large.a-color-price.savingPriceOverride.aok-align-center.reinventPriceSavingsPercentageMargin.savingsPercentage');
                 if (priceElement && savingsPercentage) {
+                    /** 
+                     * you can remove if (priceElement && savingsPercentage) {} and you can use below 2 const.
+                     * Basically removing if statement, you will get discord notification even saving percentage is not there
+                     * 
+                     * const price = priceElement ? priceElement.innerText : 'Price Not Found';
+                        const savings = savingsPercentage ? savingsPercentage.textContent : 'Savings Percentage Not Found';
+                     */
                     const price = priceElement.innerText;
                     const savings = savingsPercentage.textContent;
                     console.log('Price:', price);
@@ -132,8 +139,6 @@ async function Monitor(productLink) {
                         console.log("last notification", lastNotificationTimes);
                         console.log("checking here", lastNotificationTimes[productLinks] = currentTime);
                     }
-                } else {
-                    console.log('Price element not found.');
                 }
             }
         } else {
@@ -152,32 +157,29 @@ async function monitorProductURLs() {
     for (const productLink of productLinks) {
         await Monitor(productLink);
         // await Promise.all(monitorPromises);
-        // console.log('Monitoring completed');
+       //console.log('Monitor link', await Monitor(productLink));
     }
     await Promise.all(monitorPromises);
+    console.log('Monitor link', await Monitor(productLink));
     console.log('Monitoring completed');
 }
 
-cron.schedule('0 * * * *', async () => {
-    console.log('Monitoring started');
-    try {
-        await monitorProductURLs();
-    } catch (error) {
-        console.error('Error during monitoring:', error);
-    }
-    console.log('Monitoring completed');
-}, {
-    scheduled: true,
-    timezone: 'America/New_York'
-});
-
-// try {
-//     const monitorPromises = productLinks.map(link => Monitor(link));
-//     await Promise.all(monitorPromises);
-//     console.log('All products monitored.');
-// } catch (err) {
-//     console.error('Error:', err);
-// }
+try {
+    cron.schedule('0 * * * *', async () => {
+        console.log('Monitoring started');
+        try {
+            await monitorProductURLs();
+        } catch (error) {
+            console.error('Error during monitoring:', error);
+        }
+        console.log('Monitoring completed');
+    }, {
+        scheduled: true,
+        timezone: 'America/New_York'
+    });
+} catch (error) {
+    console.error('Cron job scheduling error:', error);
+}
 
 console.log = function () {
     process.stdout.write(util.format.apply(null, arguments) + '\n');
@@ -194,11 +196,5 @@ console.error = function () {
 const currentDate = moment().format('YYYY-MM-DD');
 const logFile = path.join(logDirectory, `script-${currentDate}.log`);
 
-// // Your script's code here
-// console.log('Starting your Node.js script...');
-
-// // Example log entries
-// console.log('This is a log message.');
-// console.error('This is an error message.');
 
 
