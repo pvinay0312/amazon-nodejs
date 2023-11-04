@@ -1,4 +1,6 @@
 node_modules
 nohup.out
-logs/script.log
 .DS_Store
+script.log
+# ignore ALL .log files
+*/.log
