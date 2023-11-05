@@ -44,7 +44,7 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
-async function Monitor(productLink) {
+export async function Monitor(productLink) {
     var myHeaders = {
         'connection' : 'keep-alive',
         'sec-ch-ua' : `"Chromium";v="118", "Google Chrome";v="118", "Not=A?Brand";v="99"`,
@@ -124,11 +124,12 @@ async function Monitor(productLink) {
                             .setTimestamp()
                             .setThumbnail(landingImageElement?.getAttribute('src'))
                             .addField(productName || 'Product Name Not Found', productLink, true)
-                            .addField('Availability', 'IN STOCK', false)
+                            //.addField('Availability', 'IN STOCK', false)
                             .addField('SKU', sku || 'SKU Not Found', true)
                             .addField('Offer ID', availabilityDiv)
                             .addField('Price', price)
-                            .addField('Saving Percentage', savings);
+                            .addField('Saving Percentage', savings)
+                            .addField('LastTimeStemp', currentTime);
 
                         await hook.send(embed);
                         console.log(productName + ': IN STOCK');
@@ -153,7 +154,7 @@ async function Monitor(productLink) {
 const monitorPromises = productLinks.map(link => Monitor(link));
 console.log('Monitoring', productLinks.map(link => Monitor(link)));
 
-async function monitorProductURLs() {
+export async function monitorProductURLs() {
     for (const productLink of productLinks) {
         await Monitor(productLink);
         // await Promise.all(monitorPromises);
