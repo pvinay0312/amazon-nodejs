@@ -192,6 +192,10 @@ export async function Monitor(productLink) {
   }
 }
 
+// Start monitoring for all product links
+// const monitorPromises = productLinks.map(link => Monitor(link));
+// console.log('Monitoring', productLinks.map(link => Monitor(link)));
+
 export async function monitorProductURLs() {
   const monitorPromises = productLinks.map(async (productLink) => {
     console.log('Monitor link', productLink);
