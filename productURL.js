@@ -41,6 +41,40 @@ export const productLinks = [
     'https://www.amazon.com/TOPRUUG-Washable-Oriental-Area-Rug/dp/B0CFY66MZG',
     'https://www.amazon.com/Homcomoda-Vintage-Washable-Non-Slip-Distressed/dp/B0CMXDSLVX',
 
+    // --- MEN'S HAIR ---
+    'https://www.amazon.com/Nizoral-Anti-Dandruff-Shampoo-Ketoconazole-Dandruff/dp/B00AINMFAC',
+    'https://www.amazon.com/Rogaine-Minoxidil-Regrowth-Treatment-Thinning/dp/B0012BNVE8',
+    'https://www.amazon.com/Keeps-Thickening-Shampoo-Thicker-Looking/dp/B0994WXS42',
+    'https://www.amazon.com/Suavecito-Pomade-Original-Hold-Pack/dp/B09B4KQS2V',
+    'https://www.amazon.com/Mens-Pomade-American-Heavy-Shine/dp/B0BQCT5HZ1',
+
+    // --- WOMEN'S HAIR ---
+    'https://www.amazon.com/VEGAMOUR-Serum-Thicker-Visibly-Longer/dp/B08KYM3Y6T',
+    'https://www.amazon.com/VEGAMOUR-GRO-Dry-Shampoo/dp/B0BRM682K5',
+    'https://www.amazon.com/Mielle-Rosemary-Mint-Hair-Masque/dp/B07N7NBYSP',
+    'https://www.amazon.com/Batiste-Shampoo-Original-162g-5-71/dp/B0BTVTH9CW',
+    'https://www.amazon.com/Rogaine-Minoxidil-Thinning-Treatment-Regrowth/dp/B00M6I5SMY',
+
+    // --- MEN'S FACE ---
+    'https://www.amazon.com/Baxter-California-Sulfate-Daily-Types/dp/B074PBHTQM',
+    'https://www.amazon.com/Baxter-California-Oil-Free-Moisturizer/dp/B0009GIHT6',
+    'https://www.amazon.com/Baxter-California-Depuffing-Reducing-Unscented/dp/B00TI4C0ES',
+    'https://www.amazon.com/Jack-Black-Clean-Facial-Cleanser/dp/B002Y2TGMA',
+
+    // --- WOMEN'S FACE / SKINCARE ---
+    'https://www.amazon.com/CeraVe-Hydrating-Facial-Cleanser-Fragrance/dp/B01MSSDEPK',
+    'https://www.amazon.com/CeraVe-Hyaluronic-Ceramides-Niacinamide-Non-Drying/dp/B07RJ18VMF',
+    'https://www.amazon.com/CeraVe-Retinol-Smoothing-Brightening-Fragrance/dp/B07XJ7XWLW',
+    'https://www.amazon.com/Roche-Posay-Wrinkles-Premature-Resurface-Sensitive/dp/B07Z9Y4M3C',
+    'https://www.amazon.com/Roche-Posay-vitamin-renovator-radiance/dp/B07PM79MSC',
+    'https://www.amazon.com/Neutrogena-Moisturizer-Retinol-Hyaluronic-Sunscreen/dp/B0081E6YX4',
+
+    // --- BATHROOM ---
+    'https://www.amazon.com/Oral-B-1000-Rechargeable-Electric-Toothbrush/dp/B003UKM9CO',
+    'https://www.amazon.com/AquaBliss-Output-12-Stage-Shower-Filter/dp/B01MUBU0YC',
+    'https://www.amazon.com/Utopia-Towels-Luxurious-Absorbent-Perfect/dp/B07SW4HB3N',
+    'https://www.amazon.com/Utopia-Towels-Piece-Towel-Washcloths/dp/B00GQP0XTQ',
+
 ];
 
 export const notificationCooldown = 3600 * 1000; // 1 hour — prevents duplicate alerts
