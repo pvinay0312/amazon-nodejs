@@ -203,19 +203,25 @@ export async function Monitor(productLink) {
                        || root.querySelector('.a-price-whole')?.textContent?.trim()
                        || 'N/A';
 
-            // --- Original / list price (for "reg $X" display and drop calculation) ---
-            const originalPrice = root.querySelector('.basisPrice .a-offscreen')?.innerText?.trim()
-                               || root.querySelector('.a-text-price .a-offscreen')?.innerText?.trim()
-                               || root.querySelector('#listPrice')?.innerText?.trim()
-                               || root.querySelector('#priceblock_was_price')?.innerText?.trim()
-                               || root.querySelector('.a-price.a-text-price[data-a-strike="true"] .a-offscreen')?.innerText?.trim()
-                               || null;
+            // --- Original / list price (for "reg $X" display) ---
+            // Use only strikethrough-specific selectors to avoid grabbing the current price again.
+            // Then discard if it parses to the same value as the current price.
+            const originalPriceRaw = root.querySelector('.basisPrice .a-offscreen')?.innerText?.trim()
+                                  || root.querySelector('#listPrice')?.innerText?.trim()
+                                  || root.querySelector('#priceblock_was_price')?.innerText?.trim()
+                                  || root.querySelector('.a-price[data-a-strike="true"] .a-offscreen')?.innerText?.trim()
+                                  || null;
+            const originalPrice = (originalPriceRaw && parsePrice(originalPriceRaw) !== parsePrice(price))
+                                  ? originalPriceRaw
+                                  : null;
 
             // --- Savings % shown by Amazon on deal pages ---
-            const savingsText = root.querySelector('.savingPriceOverride.savingsPercentage')?.textContent?.trim()
+            // Strip leading minus and normalise to "31% off" format
+            const savingsRaw  = root.querySelector('.savingPriceOverride.savingsPercentage')?.textContent?.trim()
                              || root.querySelector('#savingsPercentage')?.textContent?.trim()
                              || null;
-            const savingsPct = parseSavingsPct(savingsText);
+            const savingsText = savingsRaw ? savingsRaw.replace(/^-/, '') + ' off' : null;
+            const savingsPct  = parseSavingsPct(savingsText);
 
             // --- Lightning Deal detection ---
             const isLightningDeal = !!(
