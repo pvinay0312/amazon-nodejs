@@ -29,8 +29,9 @@ async function Monitors(product) {
     });
     if(responses && responses.statusCode == 200) {
         let roots = HTMLParser.parse(responses.body);
-        let avaiabilityStock = roots.getElementsByTagName('button')[0].getAttribute('aria-label');
-        console.log("hello", avaiabilityStock)
+        let avaiabilityStock = roots.getElementsByTagName('button');
+        let stock = avaiabilityStock[0].getAttribute('aria-label')
+        console.log("hello", stock)
         var parentDOM = roots.querySelector('#__next');
         //let productPrice = roots.querySelector('#__next > div:nth-child(1) > div > div > div > div > section > main > div > div:nth-child(2) > div > div.w_Ao.w_Bn.w_As > div > div > div.slide-sticky-buy-box-up.z-5 > div > div.pt3 > div > div > div.f6.gray.lh-title.mb3.dn.db-m > span > span:nth-child(2)').getAttribute('itemprop')
         //let productPrice = roots.getElementsByTagName('span')[2].getAttribute('itemprop')

@@ -1,61 +1,53 @@
 import got from "got";
 import HTMLParser from "node-html-parser";
-import promptSync from "prompt-sync";
-const prompt = promptSync();
-import puppeteer from 'puppeteer';
-import EventEmitter from "events";
 import fs from 'fs';
-import moment from 'moment';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import cron from 'node-cron';
-import util from 'util'; // Import the 'util' module
-
-import path from 'path'; // Import the 'path' module
+import util from 'util';
+import path from 'path';
 import delay from 'delay';
+import zlib from 'zlib';
+import { Readable } from 'stream';
 
 import { Webhook, MessageBuilder } from "discord-webhook-node";
 
-import express from "express";
-import bodyParser from "body-parser";
 import { productLinks, lastNotificationTimes, notificationCooldown } from "./productURL.js"
-
-import { pipeline } from 'stream';
-import { promisify } from 'util';
-import zlib from 'zlib';
-import stream, { Readable } from 'stream';
-const pipelineAsync = promisify(pipeline);
-
-// New app using express module
-const app = express();
-app.use(bodyParser.urlencoded({
-  extended: true
-}));
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const logFileName = 'script.log';
 
-// Use 'path' module for log directory
 const logDirectory = path.join(__dirname, 'logs');
-
-// Create the log directory if it doesn't exist
 if (!fs.existsSync(logDirectory)) {
   fs.mkdirSync(logDirectory, { recursive: true });
 }
 
-// Create a log file stream (append mode)
-const logStream = fs.createWriteStream(path.join(logDirectory, logFileName), { flags: 'a' })
+const logStream = fs.createWriteStream(path.join(logDirectory, logFileName), { flags: 'a' });
+
+// Override console before anything else so all logs are captured
+console.log = function() {
+  process.stdout.write(util.format.apply(null, arguments) + '\n');
+  logStream.write(util.format.apply(null, arguments) + '\n');
+};
+
+console.error = function() {
+  process.stderr.write(util.format.apply(null, arguments) + '\n');
+  logStream.write(util.format.apply(null, arguments) + '\n');
+};
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const MAX_RETRIES = 5;
-const RETRY_DELAY = 3000; // Delay in milliseconds
+const RETRY_DELAY = 3000;
+
+// Webhook URL — move to environment variable for safety
+const DISCORD_WEBHOOK_URL = process.env.AMAZON_WEBHOOK_URL || 'https://discord.com/api/webhooks/1165364956817002576/RIvWdsPAZ-fjuxIKPIG07emeznYuCHKLb0LW4pfdmtg5vc5H-n0RCh6jBZ-wdbuOundF';
 
 const userAgents = [
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36',
-  //You can add more user agents
+  // Add more user agents as needed
 ];
 
 export async function Monitor(productLink) {
@@ -66,7 +58,7 @@ export async function Monitor(productLink) {
         'sec-ch-ua': `"Chromium";v="118", "Google Chrome";v="118", "Not=A?Brand";v="99"`,
         'sec-ch-ua-mobile': '?0',
         'upgrade-insecure-requests': 1,
-        'user-agent': userAgents,
+        'user-agent': userAgents[Math.floor(Math.random() * userAgents.length)],
         'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
         'sec-fetch-site': 'same-origin',
         'sec-fetch-mode': 'navigate',
@@ -149,7 +141,7 @@ export async function Monitor(productLink) {
               const lastNotificationTime = lastNotificationTimes[productLink] || 0;
               if (currentTime - lastNotificationTime >= notificationCooldown) {
                 console.log("checking time", notificationCooldown);
-                const hook = new Webhook('https://discord.com/api/webhooks/1165364956817002576/RIvWdsPAZ-fjuxIKPIG07emeznYuCHKLb0LW4pfdmtg5vc5H-n0RCh6jBZ-wdbuOundF');
+                const hook = new Webhook(DISCORD_WEBHOOK_URL);
                 const embed = new MessageBuilder()
                   .setAuthor('Amazon Monitor', 'https://upload.wikimedia.org/wikipedia/commons/d/de/Amazon_icon.png')
                   .setColor('#90ee90')
@@ -158,19 +150,15 @@ export async function Monitor(productLink) {
                   .addField(productName || 'Product Name Not Found', productLink, true)
                   .addField('Availability', 'IN STOCK', false)
                   .addField('SKU', sku || 'SKU Not Found', true)
-                  //.addField('Offer ID', availabilityDiv)
                   .addField('Price', price)
-                  .addField('Saving Percentage', savings)
-                  .addField('LastTimeStemp', currentTime);
+                  .addField('Saving Percentage', savings);
 
                 await hook.send(embed);
                 console.log(productName + ': IN STOCK');
 
-                console.log('Notification sent', productLinks);
-                // Update the last notification time to the current time
-                lastNotificationTimes[productLinks] = currentTime;
-                console.log("last notification", lastNotificationTimes);
-                console.log("checking here", lastNotificationTimes[productLinks] = currentTime);
+                // Update the last notification time for this specific product link
+                lastNotificationTimes[productLink] = currentTime;
+                console.log('Notification sent for:', productLink);
               }
             }
           }
@@ -224,17 +212,3 @@ try {
   console.error('Cron job scheduling error:', error);
 }
 
-console.log = function() {
-  process.stdout.write(util.format.apply(null, arguments) + '\n');
-  logStream.write(util.format.apply(null, arguments) + '\n');
-}
-
-console.error = function() {
-  process.stderr.write(util.format.apply(null, arguments) + '\n');
-  logStream.write(util.format.apply(null, arguments) + '\n');
-}
-
-
-// Defining the log direcotry and llog file
-const currentDate = moment().format('YYYY-MM-DD');
-const logFile = path.join(logDirectory, `script-${currentDate}.log`);
