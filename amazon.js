@@ -49,6 +49,23 @@ if (!DISCORD_WEBHOOK_URL) throw new Error('Missing env var: AMAZON_WEBHOOK_URL')
 const couponNotificationCooldown = 30 * 60 * 1000;
 const lastCouponNotificationTimes = {};
 
+// Extracts clean coupon text from a DOM element.
+// Amazon sometimes embeds <style> blocks inside coupon elements — textContent
+// pulls everything including raw CSS, so we strip it before returning.
+function extractCouponText(el) {
+  if (!el) return null;
+  // Remove <style> and <script> blocks from the raw HTML, then strip all remaining tags
+  const cleaned = el.toString()
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  // Reject if it still contains CSS artifacts or is too short to be meaningful
+  if (!cleaned || cleaned.length < 5 || cleaned.includes('{') || cleaned.includes('!important')) return null;
+  return cleaned;
+}
+
 const userAgents = [
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
@@ -164,13 +181,12 @@ export async function Monitor(productLink) {
             // --- Savings % ---
             const savings = root.querySelector('.savingPriceOverride.savingsPercentage')?.textContent?.trim() || null;
 
-            // --- Coupon — Amazon uses many different elements depending on deal type ---
-            const coupon = root.querySelector('#couponText')?.textContent?.trim()
-                        || root.querySelector('#couponBadgeID')?.textContent?.trim()
-                        || root.querySelector('.couponBadgeRegularVpc')?.textContent?.trim()
-                        || root.querySelector('#vpcButton span')?.textContent?.trim()
-                        || root.querySelector('[data-feature-name="couponButton"] span')?.textContent?.trim()
-                        || root.querySelector('.promoPriceBlockMessage')?.textContent?.trim()
+            // --- Coupon — use extractCouponText to strip embedded CSS from elements ---
+            const coupon = extractCouponText(root.querySelector('#couponText'))
+                        || extractCouponText(root.querySelector('#couponBadgeID'))
+                        || extractCouponText(root.querySelector('.couponBadgeRegularVpc'))
+                        || extractCouponText(root.querySelector('#vpcButton span'))
+                        || extractCouponText(root.querySelector('[data-feature-name="couponButton"] span'))
                         || null;
 
             console.log(`${productName} [${sku}]: IN STOCK | ${price}${savings ? ` | ${savings} off` : ''}${coupon ? ` | Coupon: ${coupon}` : ''}`);
