@@ -103,43 +103,68 @@ export async function Monitor(productLink) {
         if (response && response.statusCode === 200) {
           const root = HTMLParser.parse(response.body);
 
-          // Extract availability information
-          const offerListingElement = root.querySelector('#offerListingID');
-          const availabilityDiv = offerListingElement?.getAttribute('value');
-
-          // Extract SKU information
-          const asinElement = root.querySelector('#ASIN');
-          const sku = asinElement?.getAttribute('value');
-
-          // Extract product image URL and name
-          const landingImageElement = root.querySelector('#landingImage');
-          const titleElement = root.querySelector('#productTitle');
-          let productName;
-          if (titleElement) {
-            if (titleElement.firstChild.nodeType == 3) {  // checking whether first child node is Text node
-              productName = titleElement.firstChild.text.trim();
-            } else {
-              productName = titleElement?.querySelector('span')?.innerText;
-            }
+          // Detect CAPTCHA / bot-check page — Amazon sometimes returns these instead of the product
+          const pageTitle = root.querySelector('title')?.text || '';
+          if (pageTitle.includes('Robot Check') || pageTitle.includes('CAPTCHA') || pageTitle.includes('Sorry')) {
+            console.log(`CAPTCHA detected for: ${productLink} — skipping`);
+            break;
           }
 
-          // Log product information
-          console.log('Availability Div:', availabilityDiv);
-          console.log('SKU:', sku);
-          console.log('Product Image URL:', landingImageElement?.getAttribute('src'));
-          console.log('Product Name:', productName);
+          // --- SKU / ASIN ---
+          // Fallback: extract ASIN directly from the URL (always works)
+          const asinFromUrl = productLink.match(/\/dp\/([A-Z0-9]{10})/)?.[1] || null;
+          const sku = root.querySelector('#ASIN')?.getAttribute('value')
+                   || root.querySelector('[data-asin]')?.getAttribute('data-asin')
+                   || asinFromUrl
+                   || 'N/A';
 
-          // Check availability
-          if (availabilityDiv === '') {
+          // --- Product image ---
+          const productImage = root.querySelector('#landingImage')?.getAttribute('src')
+                            || root.querySelector('#imgTagWrapperId img')?.getAttribute('src')
+                            || root.querySelector('#main-image-container img')?.getAttribute('src')
+                            || root.querySelector('.a-dynamic-image')?.getAttribute('src')
+                            || '';
+
+          // --- Product name ---
+          const titleEl = root.querySelector('#productTitle');
+          const productName = titleEl?.firstChild?.text?.trim()
+                           || titleEl?.querySelector('span')?.innerText?.trim()
+                           || root.querySelector('#title_feature_div h1 span')?.innerText?.trim()
+                           || root.querySelector('h1.a-size-large span')?.textContent?.trim()
+                           || 'Product Name Not Found';
+
+          // --- Availability — three fallback methods ---
+          const offerListingEl   = root.querySelector('#offerListingID');
+          const availabilityText = root.querySelector('#availability span')?.textContent?.trim()?.toLowerCase() || '';
+          const addToCartBtn     = root.querySelector('#add-to-cart-button');
+
+          let isAvailable = false;
+          if (offerListingEl) {
+            // Empty value = out of stock, non-empty = in stock
+            isAvailable = offerListingEl.getAttribute('value') !== '';
+          } else if (availabilityText) {
+            isAvailable = availabilityText.includes('in stock') || availabilityText.includes('available');
+          } else {
+            // Last resort: add-to-cart button presence
+            isAvailable = !!addToCartBtn;
+          }
+
+          if (!isAvailable) {
             console.log(`${productName}: OUT OF STOCK`);
           } else {
-            // Price
-            const price = root.querySelector('.a-price .a-offscreen')?.innerText || 'N/A';
+            // --- Price — multiple fallbacks ---
+            const price = root.querySelector('#corePrice_feature_div .a-offscreen')?.innerText?.trim()
+                       || root.querySelector('.a-price .a-offscreen')?.innerText?.trim()
+                       || root.querySelector('#price_inside_buybox')?.innerText?.trim()
+                       || root.querySelector('#priceblock_ourprice')?.innerText?.trim()
+                       || root.querySelector('#priceblock_dealprice')?.innerText?.trim()
+                       || root.querySelector('.a-price-whole')?.textContent?.trim()
+                       || 'N/A';
 
-            // Savings % — optional, only present when item is on sale
+            // --- Savings % ---
             const savings = root.querySelector('.savingPriceOverride.savingsPercentage')?.textContent?.trim() || null;
 
-            // Coupon — Amazon renders these in several different ways depending on product/deal type
+            // --- Coupon — Amazon uses many different elements depending on deal type ---
             const coupon = root.querySelector('#couponText')?.textContent?.trim()
                         || root.querySelector('#couponBadgeID')?.textContent?.trim()
                         || root.querySelector('.couponBadgeRegularVpc')?.textContent?.trim()
@@ -148,28 +173,26 @@ export async function Monitor(productLink) {
                         || root.querySelector('.promoPriceBlockMessage')?.textContent?.trim()
                         || null;
 
-            console.log(`${productName}: IN STOCK | ${price}${savings ? ` | ${savings} off` : ''}${coupon ? ` | Coupon: ${coupon}` : ''}`);
+            console.log(`${productName} [${sku}]: IN STOCK | ${price}${savings ? ` | ${savings} off` : ''}${coupon ? ` | Coupon: ${coupon}` : ''}`);
 
-            const currentTime = Date.now();
+            const currentTime     = Date.now();
             const lastStockNotif  = lastNotificationTimes[productLink] || 0;
             const lastCouponNotif = lastCouponNotificationTimes[productLink] || 0;
 
             const stockCooldownPassed  = currentTime - lastStockNotif  >= notificationCooldown;
             const couponCooldownPassed = currentTime - lastCouponNotif >= couponNotificationCooldown;
-
-            // Notify if: stock cooldown passed OR a new coupon appeared that hasn't been alerted yet
             const shouldNotify = stockCooldownPassed || (coupon && couponCooldownPassed);
 
             if (shouldNotify) {
               const hook = new Webhook(DISCORD_WEBHOOK_URL);
               const embed = new MessageBuilder()
                 .setAuthor('Amazon Monitor', 'https://upload.wikimedia.org/wikipedia/commons/d/de/Amazon_icon.png')
-                .setColor(coupon ? '#FFD700' : '#90ee90') // gold for coupon, green for stock
+                .setColor(coupon ? '#FFD700' : '#90ee90')
                 .setTimestamp()
-                .setThumbnail(landingImageElement?.getAttribute('src'))
-                .addField(productName || 'Product Name Not Found', productLink, true)
+                .setThumbnail(productImage)
+                .addField(productName, productLink, true)
                 .addField('Availability', 'IN STOCK ✅', false)
-                .addField('SKU', sku || 'N/A', true)
+                .addField('SKU', sku, true)
                 .addField('Price', price);
 
               if (savings) embed.addField('Savings', savings);
@@ -177,14 +200,14 @@ export async function Monitor(productLink) {
 
               await hook.send(embed);
 
-              if (stockCooldownPassed)         lastNotificationTimes[productLink]       = currentTime;
-              if (coupon && couponCooldownPassed) lastCouponNotificationTimes[productLink] = currentTime;
+              if (stockCooldownPassed)              lastNotificationTimes[productLink]       = currentTime;
+              if (coupon && couponCooldownPassed)    lastCouponNotificationTimes[productLink] = currentTime;
 
               console.log(`Notification sent for: ${productLink}${coupon ? ' [COUPON]' : ''}`);
             }
           }
         } else {
-          console.log('Invalid response');
+          console.log('Invalid response for:', productLink);
         }
       } catch (error) {
         console.error('Error while scraping:', error);
