@@ -126,41 +126,43 @@ export async function Monitor(productLink) {
 
           // Check availability
           if (availabilityDiv === '') {
-            console.log('OUT OF STOCK');
+            console.log(`${productName}: OUT OF STOCK`);
           } else {
-            // Extract product price
-            const priceElement = root.querySelector('.a-price .a-offscreen');
-            // Extract Saving Percentage
-            const savingsPercentage = root.querySelector('.a-size-large.a-color-price.savingPriceOverride.aok-align-center.reinventPriceSavingsPercentageMargin.savingsPercentage');
-            if (priceElement && savingsPercentage) {
-              const price = priceElement.innerText;
-              const savings = savingsPercentage.textContent;
-              console.log('Price:', price);
-              console.log('Savings Percentage:', savings);
+            // Price
+            const price = root.querySelector('.a-price .a-offscreen')?.innerText || 'N/A';
 
-              const currentTime = Date.now();
-              const lastNotificationTime = lastNotificationTimes[productLink] || 0;
-              if (currentTime - lastNotificationTime >= notificationCooldown) {
-                console.log("checking time", notificationCooldown);
-                const hook = new Webhook(DISCORD_WEBHOOK_URL);
-                const embed = new MessageBuilder()
-                  .setAuthor('Amazon Monitor', 'https://upload.wikimedia.org/wikipedia/commons/d/de/Amazon_icon.png')
-                  .setColor('#90ee90')
-                  .setTimestamp()
-                  .setThumbnail(landingImageElement?.getAttribute('src'))
-                  .addField(productName || 'Product Name Not Found', productLink, true)
-                  .addField('Availability', 'IN STOCK', false)
-                  .addField('SKU', sku || 'SKU Not Found', true)
-                  .addField('Price', price)
-                  .addField('Saving Percentage', savings);
+            // Savings % — optional, only present when on sale
+            const savings = root.querySelector('.savingPriceOverride.savingsPercentage')?.textContent?.trim() || null;
 
-                await hook.send(embed);
-                console.log(productName + ': IN STOCK');
+            // Coupon — Amazon shows clippable coupons in #couponText or badge spans
+            const coupon = root.querySelector('#couponText')?.textContent?.trim()
+                        || root.querySelector('.couponBadgeRegularVpc')?.textContent?.trim()
+                        || root.querySelector('[data-feature-name="couponButton"] span')?.textContent?.trim()
+                        || null;
 
-                // Update the last notification time for this specific product link
-                lastNotificationTimes[productLink] = currentTime;
-                console.log('Notification sent for:', productLink);
-              }
+            console.log(`${productName}: IN STOCK | ${price}${savings ? ` | ${savings} off` : ''}${coupon ? ` | Coupon: ${coupon}` : ''}`);
+
+            const currentTime = Date.now();
+            const lastNotificationTime = lastNotificationTimes[productLink] || 0;
+            if (currentTime - lastNotificationTime >= notificationCooldown) {
+              const hook = new Webhook(DISCORD_WEBHOOK_URL);
+              const embed = new MessageBuilder()
+                .setAuthor('Amazon Monitor', 'https://upload.wikimedia.org/wikipedia/commons/d/de/Amazon_icon.png')
+                .setColor('#90ee90')
+                .setTimestamp()
+                .setThumbnail(landingImageElement?.getAttribute('src'))
+                .addField(productName || 'Product Name Not Found', productLink, true)
+                .addField('Availability', 'IN STOCK ✅', false)
+                .addField('SKU', sku || 'N/A', true)
+                .addField('Price', price);
+
+              // Only add these fields when the data actually exists
+              if (savings) embed.addField('Savings', savings);
+              if (coupon)  embed.addField('🎟️ Coupon', coupon);
+
+              await hook.send(embed);
+              lastNotificationTimes[productLink] = currentTime;
+              console.log('Notification sent for:', productLink);
             }
           }
         } else {
