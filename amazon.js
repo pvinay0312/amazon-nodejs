@@ -40,8 +40,9 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const MAX_RETRIES = 5;
 const RETRY_DELAY = 3000;
 
-// Webhook URL — move to environment variable for safety
-const DISCORD_WEBHOOK_URL = process.env.AMAZON_WEBHOOK_URL || 'https://discord.com/api/webhooks/1165364956817002576/RIvWdsPAZ-fjuxIKPIG07emeznYuCHKLb0LW4pfdmtg5vc5H-n0RCh6jBZ-wdbuOundF';
+// Set AMAZON_WEBHOOK_URL in your .env file — never hardcode tokens
+const DISCORD_WEBHOOK_URL = process.env.AMAZON_WEBHOOK_URL;
+if (!DISCORD_WEBHOOK_URL) throw new Error('Missing env var: AMAZON_WEBHOOK_URL');
 
 const userAgents = [
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
