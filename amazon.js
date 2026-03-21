@@ -40,28 +40,57 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const MAX_RETRIES = 5;
 const RETRY_DELAY = 3000;
 
+// Minimum savings % needed to trigger a notification when there's no coupon
+const MIN_SAVINGS_PCT = 15;
+
 // Set AMAZON_WEBHOOK_URL in your .env file — never hardcode tokens
 const DISCORD_WEBHOOK_URL = process.env.AMAZON_WEBHOOK_URL;
 if (!DISCORD_WEBHOOK_URL) throw new Error('Missing env var: AMAZON_WEBHOOK_URL');
 
-// Separate cooldown for coupon alerts (30 min) vs stock alerts (1 hour)
-// This ensures a new coupon triggers a notification even if stock was recently alerted
+// Separate cooldowns: coupon alerts (30 min) vs deal/stock alerts (1 hour)
 const couponNotificationCooldown = 30 * 60 * 1000;
 const lastCouponNotificationTimes = {};
+
+// --- Price history: persist last known price per ASIN to detect drops across runs ---
+const priceHistoryFile = path.join(logDirectory, 'price_history.json');
+
+function loadPriceHistory() {
+  try {
+    return JSON.parse(fs.readFileSync(priceHistoryFile, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+function savePriceHistory(history) {
+  fs.writeFileSync(priceHistoryFile, JSON.stringify(history, null, 2));
+}
+
+// Parse "$29.99" or "29.99" → 29.99, returns null if unparseable
+function parsePrice(priceStr) {
+  if (!priceStr || priceStr === 'N/A') return null;
+  const match = priceStr.replace(/,/g, '').match(/[\d.]+/);
+  return match ? parseFloat(match[0]) : null;
+}
+
+// Parse "-15%" or "15% off" → 15, returns null if unparseable
+function parseSavingsPct(savingsStr) {
+  if (!savingsStr) return null;
+  const match = savingsStr.match(/(\d+)/);
+  return match ? parseInt(match[1], 10) : null;
+}
 
 // Extracts clean coupon text from a DOM element.
 // Amazon sometimes embeds <style> blocks inside coupon elements — textContent
 // pulls everything including raw CSS, so we strip it before returning.
 function extractCouponText(el) {
   if (!el) return null;
-  // Remove <style> and <script> blocks from the raw HTML, then strip all remaining tags
   const cleaned = el.toString()
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim();
-  // Reject if it still contains CSS artifacts or is too short to be meaningful
   if (!cleaned || cleaned.length < 5 || cleaned.includes('{') || cleaned.includes('!important')) return null;
   return cleaned;
 }
@@ -70,7 +99,6 @@ const userAgents = [
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36',
-  // Add more user agents as needed
 ];
 
 export async function Monitor(productLink) {
@@ -120,7 +148,7 @@ export async function Monitor(productLink) {
         if (response && response.statusCode === 200) {
           const root = HTMLParser.parse(response.body);
 
-          // Detect CAPTCHA / bot-check page — Amazon sometimes returns these instead of the product
+          // Detect CAPTCHA / bot-check page
           const pageTitle = root.querySelector('title')?.text || '';
           if (pageTitle.includes('Robot Check') || pageTitle.includes('CAPTCHA') || pageTitle.includes('Sorry')) {
             console.log(`CAPTCHA detected for: ${productLink} — skipping`);
@@ -128,7 +156,6 @@ export async function Monitor(productLink) {
           }
 
           // --- SKU / ASIN ---
-          // Fallback: extract ASIN directly from the URL (always works)
           const asinFromUrl = productLink.match(/\/dp\/([A-Z0-9]{10})/)?.[1] || null;
           const sku = root.querySelector('#ASIN')?.getAttribute('value')
                    || root.querySelector('[data-asin]')?.getAttribute('data-asin')
@@ -157,19 +184,17 @@ export async function Monitor(productLink) {
 
           let isAvailable = false;
           if (offerListingEl) {
-            // Empty value = out of stock, non-empty = in stock
             isAvailable = offerListingEl.getAttribute('value') !== '';
           } else if (availabilityText) {
             isAvailable = availabilityText.includes('in stock') || availabilityText.includes('available');
           } else {
-            // Last resort: add-to-cart button presence
             isAvailable = !!addToCartBtn;
           }
 
           if (!isAvailable) {
             console.log(`${productName}: OUT OF STOCK`);
           } else {
-            // --- Price — multiple fallbacks ---
+            // --- Current price ---
             const price = root.querySelector('#corePrice_feature_div .a-offscreen')?.innerText?.trim()
                        || root.querySelector('.a-price .a-offscreen')?.innerText?.trim()
                        || root.querySelector('#price_inside_buybox')?.innerText?.trim()
@@ -178,10 +203,29 @@ export async function Monitor(productLink) {
                        || root.querySelector('.a-price-whole')?.textContent?.trim()
                        || 'N/A';
 
-            // --- Savings % ---
-            const savings = root.querySelector('.savingPriceOverride.savingsPercentage')?.textContent?.trim() || null;
+            // --- Original / list price (for "reg $X" display and drop calculation) ---
+            const originalPrice = root.querySelector('.basisPrice .a-offscreen')?.innerText?.trim()
+                               || root.querySelector('.a-text-price .a-offscreen')?.innerText?.trim()
+                               || root.querySelector('#listPrice')?.innerText?.trim()
+                               || root.querySelector('#priceblock_was_price')?.innerText?.trim()
+                               || root.querySelector('.a-price.a-text-price[data-a-strike="true"] .a-offscreen')?.innerText?.trim()
+                               || null;
 
-            // --- Coupon — use extractCouponText to strip embedded CSS from elements ---
+            // --- Savings % shown by Amazon on deal pages ---
+            const savingsText = root.querySelector('.savingPriceOverride.savingsPercentage')?.textContent?.trim()
+                             || root.querySelector('#savingsPercentage')?.textContent?.trim()
+                             || null;
+            const savingsPct = parseSavingsPct(savingsText);
+
+            // --- Lightning Deal detection ---
+            const isLightningDeal = !!(
+              root.querySelector('#dealBadge') ||
+              root.querySelector('#dealBadgeSupportingText') ||
+              root.querySelector('.dealBadge') ||
+              root.querySelector('[id*="deal-badge"]')
+            );
+
+            // --- Coupon ---
             const coupon = extractCouponText(root.querySelector('#couponText'))
                         || extractCouponText(root.querySelector('#couponBadgeID'))
                         || extractCouponText(root.querySelector('.couponBadgeRegularVpc'))
@@ -189,37 +233,104 @@ export async function Monitor(productLink) {
                         || extractCouponText(root.querySelector('[data-feature-name="couponButton"] span'))
                         || null;
 
-            console.log(`${productName} [${sku}]: IN STOCK | ${price}${savings ? ` | ${savings} off` : ''}${coupon ? ` | Coupon: ${coupon}` : ''}`);
+            // --- Price drop detection via persisted history ---
+            const priceHistory  = loadPriceHistory();
+            const currentPriceNum = parsePrice(price);
+            const lastKnownPrice  = priceHistory[sku] ?? null;
+            let priceDrop = null;
+            let priceDropPct = null;
 
-            const currentTime     = Date.now();
-            const lastStockNotif  = lastNotificationTimes[productLink] || 0;
-            const lastCouponNotif = lastCouponNotificationTimes[productLink] || 0;
+            if (currentPriceNum && lastKnownPrice && currentPriceNum < lastKnownPrice) {
+              const dropAmt = lastKnownPrice - currentPriceNum;
+              priceDropPct  = Math.round((dropAmt / lastKnownPrice) * 100);
+              if (priceDropPct >= MIN_SAVINGS_PCT) {
+                priceDrop = { from: `$${lastKnownPrice.toFixed(2)}`, to: price, pct: priceDropPct };
+              }
+            }
+            if (currentPriceNum) {
+              priceHistory[sku] = currentPriceNum;
+              savePriceHistory(priceHistory);
+            }
 
-            const stockCooldownPassed  = currentTime - lastStockNotif  >= notificationCooldown;
-            const couponCooldownPassed = currentTime - lastCouponNotif >= couponNotificationCooldown;
-            const shouldNotify = stockCooldownPassed || (coupon && couponCooldownPassed);
+            // --- Is this a real deal worth notifying? ---
+            // Only alert when: coupon present, lightning deal, savings >= 15%, or price dropped >= 15%
+            const effectiveSavingsPct = savingsPct ?? priceDropPct ?? 0;
+            const isDeal = coupon || isLightningDeal || effectiveSavingsPct >= MIN_SAVINGS_PCT;
 
-            if (shouldNotify) {
-              const hook = new Webhook(DISCORD_WEBHOOK_URL);
-              const embed = new MessageBuilder()
-                .setAuthor('Amazon Monitor', 'https://upload.wikimedia.org/wikipedia/commons/d/de/Amazon_icon.png')
-                .setColor(coupon ? '#FFD700' : '#90ee90')
-                .setTimestamp()
-                .setThumbnail(productImage)
-                .addField(productName, productLink, true)
-                .addField('Availability', 'IN STOCK ✅', false)
-                .addField('SKU', sku, true)
-                .addField('Price', price);
+            // --- Deal type label and embed color ---
+            let dealLabel, embedColor;
+            if (isLightningDeal) {
+              dealLabel  = '⚡ Lightning Deal';
+              embedColor = '#FF4500';
+            } else if (coupon) {
+              dealLabel  = '🎟️ Coupon Deal';
+              embedColor = '#FFD700';
+            } else if (priceDrop) {
+              dealLabel  = '📉 Price Drop';
+              embedColor = '#1E90FF';
+            } else if (effectiveSavingsPct >= MIN_SAVINGS_PCT) {
+              dealLabel  = '🔥 Big Discount';
+              embedColor = '#FF6347';
+            } else {
+              dealLabel  = null;
+              embedColor = '#90ee90';
+            }
 
-              if (savings) embed.addField('Savings', savings);
-              if (coupon)  embed.addField('🎟️ Coupon Code', coupon);
+            const logLine = `${productName} [${sku}]: IN STOCK | ${price}`
+              + (originalPrice   ? ` (reg ${originalPrice})` : '')
+              + (savingsText     ? ` | ${savingsText} off`   : '')
+              + (coupon          ? ` | Coupon: ${coupon}`    : '')
+              + (isLightningDeal ? ` | LIGHTNING DEAL`       : '')
+              + (priceDrop       ? ` | DROP ${priceDrop.from} → ${priceDrop.to}` : '');
+            console.log(logLine);
 
-              await hook.send(embed);
+            if (!isDeal) {
+              console.log(`  → No deal (full price), skipping notification`);
+            } else {
+              const currentTime     = Date.now();
+              const lastStockNotif  = lastNotificationTimes[productLink] || 0;
+              const lastCouponNotif = lastCouponNotificationTimes[productLink] || 0;
 
-              if (stockCooldownPassed)              lastNotificationTimes[productLink]       = currentTime;
-              if (coupon && couponCooldownPassed)    lastCouponNotificationTimes[productLink] = currentTime;
+              const stockCooldownPassed  = currentTime - lastStockNotif  >= notificationCooldown;
+              const couponCooldownPassed = currentTime - lastCouponNotif >= couponNotificationCooldown;
+              const shouldNotify = coupon ? couponCooldownPassed : stockCooldownPassed;
 
-              console.log(`Notification sent for: ${productLink}${coupon ? ' [COUPON]' : ''}`);
+              if (shouldNotify) {
+                // Title styled like: "🔥 73% OFF! Sony WH-1000XM5 Headphones"
+                const pctLabel   = effectiveSavingsPct > 0 ? `${effectiveSavingsPct}% OFF! ` : '';
+                const regLabel   = originalPrice ? ` (reg ${originalPrice})` : '';
+                const embedTitle = dealLabel
+                  ? `${dealLabel} — ${pctLabel}${productName}`
+                  : productName;
+                const priceDisplay = `${price}${regLabel}`;
+
+                const hook  = new Webhook(DISCORD_WEBHOOK_URL);
+                const embed = new MessageBuilder()
+                  .setAuthor('Amazon Deal Alert 🛒', 'https://upload.wikimedia.org/wikipedia/commons/d/de/Amazon_icon.png')
+                  .setColor(embedColor)
+                  .setTitle(embedTitle)
+                  .setURL(productLink)
+                  .setTimestamp()
+                  .setThumbnail(productImage)
+                  .addField('💰 Price', priceDisplay, true)
+                  .addField('📦 ASIN', sku, true);
+
+                if (priceDrop)                    embed.addField('📉 Price Drop', `~~${priceDrop.from}~~ → **${priceDrop.to}** (${priceDrop.pct}% off)`, false);
+                if (savingsText && !priceDrop)     embed.addField('💸 Savings', savingsText, true);
+                if (coupon)                        embed.addField('🎟️ Use Code at Checkout', `\`${coupon}\``, false);
+                if (isLightningDeal)               embed.addField('⚡ Lightning Deal', 'Limited time — act fast!', false);
+
+                embed.addField('🔗 Buy Now', productLink, false);
+
+                await hook.send(embed);
+
+                if (coupon && couponCooldownPassed)  lastCouponNotificationTimes[productLink] = currentTime;
+                if (!coupon && stockCooldownPassed)  lastNotificationTimes[productLink]       = currentTime;
+
+                console.log(`  → Notification sent [${dealLabel || 'deal'}]: ${productLink}`);
+              } else {
+                console.log(`  → Deal found but cooldown active, skipping`);
+              }
             }
           }
         } else {
@@ -228,31 +339,27 @@ export async function Monitor(productLink) {
       } catch (error) {
         console.error('Error while scraping:', error);
       }
-      break; // if successful, break the loop
+      break; // success — exit retry loop
 
     } catch (error) {
       if (error.response && error.response.statusCode === 503 && attempt < MAX_RETRIES - 1) {
         await wait(RETRY_DELAY);
       } else {
-        throw error; // if error is not 503 or retries exceeded, throw error
+        throw error;
       }
     }
   }
 }
 
-// Start monitoring for all product links
-// const monitorPromises = productLinks.map(link => Monitor(link));
-// console.log('Monitoring', productLinks.map(link => Monitor(link)));
-
 export async function monitorProductURLs() {
   const monitorPromises = productLinks.map(async (productLink) => {
     console.log('Monitor link', productLink);
     await Monitor(productLink);
-    await delay(3000); // 3 seconds between products — polite but fast
+    await delay(3000); // 3 seconds between products
   });
 
   await Promise.all(monitorPromises);
-  console.log('Monitoring');
+  console.log('Monitoring cycle complete');
 }
 
 try {
@@ -271,4 +378,3 @@ try {
 } catch (error) {
   console.error('Cron job scheduling error:', error);
 }
-
