@@ -44,6 +44,11 @@ const RETRY_DELAY = 3000;
 const DISCORD_WEBHOOK_URL = process.env.AMAZON_WEBHOOK_URL;
 if (!DISCORD_WEBHOOK_URL) throw new Error('Missing env var: AMAZON_WEBHOOK_URL');
 
+// Separate cooldown for coupon alerts (30 min) vs stock alerts (1 hour)
+// This ensures a new coupon triggers a notification even if stock was recently alerted
+const couponNotificationCooldown = 30 * 60 * 1000;
+const lastCouponNotificationTimes = {};
+
 const userAgents = [
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36',
@@ -131,24 +136,35 @@ export async function Monitor(productLink) {
             // Price
             const price = root.querySelector('.a-price .a-offscreen')?.innerText || 'N/A';
 
-            // Savings % — optional, only present when on sale
+            // Savings % — optional, only present when item is on sale
             const savings = root.querySelector('.savingPriceOverride.savingsPercentage')?.textContent?.trim() || null;
 
-            // Coupon — Amazon shows clippable coupons in #couponText or badge spans
+            // Coupon — Amazon renders these in several different ways depending on product/deal type
             const coupon = root.querySelector('#couponText')?.textContent?.trim()
+                        || root.querySelector('#couponBadgeID')?.textContent?.trim()
                         || root.querySelector('.couponBadgeRegularVpc')?.textContent?.trim()
+                        || root.querySelector('#vpcButton span')?.textContent?.trim()
                         || root.querySelector('[data-feature-name="couponButton"] span')?.textContent?.trim()
+                        || root.querySelector('.promoPriceBlockMessage')?.textContent?.trim()
                         || null;
 
             console.log(`${productName}: IN STOCK | ${price}${savings ? ` | ${savings} off` : ''}${coupon ? ` | Coupon: ${coupon}` : ''}`);
 
             const currentTime = Date.now();
-            const lastNotificationTime = lastNotificationTimes[productLink] || 0;
-            if (currentTime - lastNotificationTime >= notificationCooldown) {
+            const lastStockNotif  = lastNotificationTimes[productLink] || 0;
+            const lastCouponNotif = lastCouponNotificationTimes[productLink] || 0;
+
+            const stockCooldownPassed  = currentTime - lastStockNotif  >= notificationCooldown;
+            const couponCooldownPassed = currentTime - lastCouponNotif >= couponNotificationCooldown;
+
+            // Notify if: stock cooldown passed OR a new coupon appeared that hasn't been alerted yet
+            const shouldNotify = stockCooldownPassed || (coupon && couponCooldownPassed);
+
+            if (shouldNotify) {
               const hook = new Webhook(DISCORD_WEBHOOK_URL);
               const embed = new MessageBuilder()
                 .setAuthor('Amazon Monitor', 'https://upload.wikimedia.org/wikipedia/commons/d/de/Amazon_icon.png')
-                .setColor('#90ee90')
+                .setColor(coupon ? '#FFD700' : '#90ee90') // gold for coupon, green for stock
                 .setTimestamp()
                 .setThumbnail(landingImageElement?.getAttribute('src'))
                 .addField(productName || 'Product Name Not Found', productLink, true)
@@ -156,13 +172,15 @@ export async function Monitor(productLink) {
                 .addField('SKU', sku || 'N/A', true)
                 .addField('Price', price);
 
-              // Only add these fields when the data actually exists
               if (savings) embed.addField('Savings', savings);
-              if (coupon)  embed.addField('🎟️ Coupon', coupon);
+              if (coupon)  embed.addField('🎟️ Coupon Code', coupon);
 
               await hook.send(embed);
-              lastNotificationTimes[productLink] = currentTime;
-              console.log('Notification sent for:', productLink);
+
+              if (stockCooldownPassed)         lastNotificationTimes[productLink]       = currentTime;
+              if (coupon && couponCooldownPassed) lastCouponNotificationTimes[productLink] = currentTime;
+
+              console.log(`Notification sent for: ${productLink}${coupon ? ' [COUPON]' : ''}`);
             }
           }
         } else {
@@ -191,7 +209,7 @@ export async function monitorProductURLs() {
   const monitorPromises = productLinks.map(async (productLink) => {
     console.log('Monitor link', productLink);
     await Monitor(productLink);
-    await delay(50000); // Adding a delay of 50 seconds
+    await delay(3000); // 3 seconds between products — polite but fast
   });
 
   await Promise.all(monitorPromises);
@@ -199,7 +217,7 @@ export async function monitorProductURLs() {
 }
 
 try {
-  cron.schedule('0 * * * *', async () => {
+  cron.schedule('*/15 * * * *', async () => {
     console.log('Monitoring started');
     try {
       await monitorProductURLs();
