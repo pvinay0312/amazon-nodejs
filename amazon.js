@@ -214,18 +214,38 @@ export async function Monitor(productLink) {
           const stockCount           = limitedStockMatch ? parseInt(limitedStockMatch[1]) : null;
           const isLimitedStock       = stockCount !== null && stockCount <= 10;
 
-          // --- Restock detection: was this product OOS on the last cycle? ---
-          const stockStatus  = loadStockStatus();
-          const wasOutOfStock = stockStatus[sku] === 'out_of_stock';
-          stockStatus[sku]   = isAvailable ? 'in_stock' : 'out_of_stock';
+          // --- Restock detection ---
+          // We require a product to be OOS for 2+ consecutive cycles before treating
+          // it as "truly OOS". This prevents false restock alerts caused by a single
+          // failed scrape (CAPTCHA, network blip) that incorrectly recorded OOS.
+          const stockStatus   = loadStockStatus();
+          const prev          = stockStatus[sku] || { status: 'unknown', oosCount: 0 };
+          const wasDefinitelyOOS = prev.status === 'out_of_stock' && prev.oosCount >= 2;
+
+          if (isAvailable) {
+            stockStatus[sku] = { status: 'in_stock', oosCount: 0 };
+          } else {
+            stockStatus[sku] = { status: 'out_of_stock', oosCount: (prev.oosCount || 0) + 1 };
+          }
           saveStockStatus(stockStatus);
 
           if (!isAvailable) {
-            console.log(`${productName}: OUT OF STOCK`);
+            const streak = stockStatus[sku].oosCount;
+            console.log(`${productName}: OUT OF STOCK (${streak} consecutive cycle${streak !== 1 ? 's' : ''})`);
           } else {
+            // --- Current price (extracted first so restock embed can include it) ---
+            const price = root.querySelector('#corePrice_feature_div .a-offscreen')?.innerText?.trim()
+                       || root.querySelector('.a-price .a-offscreen')?.innerText?.trim()
+                       || root.querySelector('#price_inside_buybox')?.innerText?.trim()
+                       || root.querySelector('#priceblock_ourprice')?.innerText?.trim()
+                       || root.querySelector('#priceblock_dealprice')?.innerText?.trim()
+                       || root.querySelector('.a-price-whole')?.textContent?.trim()
+                       || 'N/A';
+
             // --- Back in stock alert (fires immediately, no deal filter, no cooldown) ---
-            if (wasOutOfStock) {
-              console.log(`${productName} [${sku}]: BACK IN STOCK — sending restock alert`);
+            // Only fires when the product was confirmed OOS for 2+ cycles, then came back.
+            if (wasDefinitelyOOS) {
+              console.log(`${productName} [${sku}]: BACK IN STOCK after ${prev.oosCount} OOS cycles — sending restock alert`);
               try {
                 const hook  = new Webhook(DISCORD_WEBHOOK_URL);
                 const embed = new MessageBuilder()
@@ -236,6 +256,7 @@ export async function Monitor(productLink) {
                   .setTimestamp()
                   .setThumbnail(productImage)
                   .addField('✅ Status', 'Back in Stock', true)
+                  .addField('💰 Price', price, true)
                   .addField('📦 ASIN', sku, true)
                   .addField('🔗 Buy Now', productLink, false);
                 await hook.send(embed);
@@ -243,14 +264,6 @@ export async function Monitor(productLink) {
                 console.error('Restock alert failed:', err.message);
               }
             }
-            // --- Current price ---
-            const price = root.querySelector('#corePrice_feature_div .a-offscreen')?.innerText?.trim()
-                       || root.querySelector('.a-price .a-offscreen')?.innerText?.trim()
-                       || root.querySelector('#price_inside_buybox')?.innerText?.trim()
-                       || root.querySelector('#priceblock_ourprice')?.innerText?.trim()
-                       || root.querySelector('#priceblock_dealprice')?.innerText?.trim()
-                       || root.querySelector('.a-price-whole')?.textContent?.trim()
-                       || 'N/A';
 
             // --- Original / list price (for "reg $X" display) ---
             // Use only strikethrough-specific selectors to avoid grabbing the current price again.
