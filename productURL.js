@@ -111,6 +111,40 @@ export const productLinks = [
     'https://www.amazon.com/Utopia-Towels-Luxurious-Absorbent-Perfect/dp/B07SW4HB3N',
     'https://www.amazon.com/Utopia-Towels-Piece-Towel-Washcloths/dp/B00GQP0XTQ',
 
+    // =========================================================
+    // RESTOCK WATCHLIST — products that sell out fast.
+    // The monitor tracks their stock status each cycle and fires
+    // an instant "🔔 Back in Stock!" alert the moment they return.
+    // =========================================================
+
+    // --- GAMING: Consoles & Controllers (sell out constantly) ---
+    'https://www.amazon.com/PlayStation-5-Console-CFI-2015A01X/dp/B0CL5KNB9M',
+    'https://www.amazon.com/Nintendo-Switch-OLED-Model-Neon-Joy/dp/B098RL6SBJ',
+    'https://www.amazon.com/Nintendo-Switch-OLED-Model-White-Joy/dp/B098BKLHBJ',
+    'https://www.amazon.com/DualSense-Wireless-Controller-PlayStation-5/dp/B08H99BPJN',
+    'https://www.amazon.com/Nintendo-Switch-Pro-Controller/dp/B01NAWKPOF',
+
+    // --- GAMING: GPUs (limited supply, restocks sell in minutes) ---
+    'https://www.amazon.com/ASUS-GeForce-DisplayPort-Axial-tech-Technology/dp/B0CNBGFQWG',
+    'https://www.amazon.com/MSI-RTX-4070-GAMING-16G/dp/B0CNQKSFXR',
+
+    // --- ELECTRONICS: AirPods (gift season sell-outs) ---
+    'https://www.amazon.com/Apple-Generation-Cancelling-Transparency-Personalized/dp/B0CHWRXH8B',
+    'https://www.amazon.com/Apple-AirPods-Charging-Released-2019/dp/B07PXGQC1Q',
+
+    // --- HEALTH: GLP-1 adjacent / weight loss supplements (high demand) ---
+    'https://www.amazon.com/Hydroxycut-Hardcore-Weight-Energy-Supplement/dp/B001CNXO2G',
+    'https://www.amazon.com/Transparent-Labs-LEAN-Thermogenic-Fat-Burner/dp/B07XGG4WDT',
+
+    // --- BEAUTY: Viral / sold-out products ---
+    'https://www.amazon.com/Charlotte-Tilbury-Pillow-Talk-Lipstick/dp/B07V5RNMB6',
+    'https://www.amazon.com/Stanley-Quencher-FlowState-Tumbler-Meadow/dp/B0CJHQHPPF',
+    'https://www.amazon.com/Stanley-Quencher-FlowState-Stainless-Dishwasher/dp/B09JQMJHXY',
+
+    // --- OUTDOOR / SEASONAL: Portable power stations (fly off shelves pre-storm) ---
+    'https://www.amazon.com/Jackery-Portable-Explorer-Generator-Emergency/dp/B082TMBYR6',
+    'https://www.amazon.com/EcoFlow-Portable-Generator-Emergency-Charging/dp/B0CG5PQB7T',
+
 ];
 
 export const notificationCooldown = 3600 * 1000; // 1 hour — prevents duplicate alerts

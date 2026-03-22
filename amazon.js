@@ -66,6 +66,23 @@ function savePriceHistory(history) {
   fs.writeFileSync(priceHistoryFile, JSON.stringify(history, null, 2));
 }
 
+// --- Stock status: track whether each ASIN was in/out of stock last check ---
+// When a product flips from out-of-stock → in-stock we fire an instant restock alert,
+// bypassing the deal filter and cooldown entirely.
+const stockStatusFile = path.join(logDirectory, 'stock_status.json');
+
+function loadStockStatus() {
+  try {
+    return JSON.parse(fs.readFileSync(stockStatusFile, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+function saveStockStatus(status) {
+  fs.writeFileSync(stockStatusFile, JSON.stringify(status, null, 2));
+}
+
 // Parse "$29.99" or "29.99" → 29.99, returns null if unparseable
 function parsePrice(priceStr) {
   if (!priceStr || priceStr === 'N/A') return null;
@@ -192,17 +209,40 @@ export async function Monitor(productLink) {
           }
 
           // --- Limited stock detection ---
-          // "Only 3 left in stock — order soon" is a major urgency signal.
-          // If stock is low AND there's a deal, we bypass the cooldown so subscribers
-          // get the alert before it sells out.
           const availabilityFullText = root.querySelector('#availability')?.textContent?.trim() || '';
           const limitedStockMatch    = availabilityFullText.match(/only\s+(\d+)\s+left/i);
           const stockCount           = limitedStockMatch ? parseInt(limitedStockMatch[1]) : null;
           const isLimitedStock       = stockCount !== null && stockCount <= 10;
 
+          // --- Restock detection: was this product OOS on the last cycle? ---
+          const stockStatus  = loadStockStatus();
+          const wasOutOfStock = stockStatus[sku] === 'out_of_stock';
+          stockStatus[sku]   = isAvailable ? 'in_stock' : 'out_of_stock';
+          saveStockStatus(stockStatus);
+
           if (!isAvailable) {
             console.log(`${productName}: OUT OF STOCK`);
           } else {
+            // --- Back in stock alert (fires immediately, no deal filter, no cooldown) ---
+            if (wasOutOfStock) {
+              console.log(`${productName} [${sku}]: BACK IN STOCK — sending restock alert`);
+              try {
+                const hook  = new Webhook(DISCORD_WEBHOOK_URL);
+                const embed = new MessageBuilder()
+                  .setAuthor('Amazon Restock Alert 🔔', 'https://upload.wikimedia.org/wikipedia/commons/d/de/Amazon_icon.png')
+                  .setColor('#00FF7F')
+                  .setTitle(`🔔 Back in Stock! — ${productName}`)
+                  .setURL(productLink)
+                  .setTimestamp()
+                  .setThumbnail(productImage)
+                  .addField('✅ Status', 'Back in Stock', true)
+                  .addField('📦 ASIN', sku, true)
+                  .addField('🔗 Buy Now', productLink, false);
+                await hook.send(embed);
+              } catch (err) {
+                console.error('Restock alert failed:', err.message);
+              }
+            }
             // --- Current price ---
             const price = root.querySelector('#corePrice_feature_div .a-offscreen')?.innerText?.trim()
                        || root.querySelector('.a-price .a-offscreen')?.innerText?.trim()
