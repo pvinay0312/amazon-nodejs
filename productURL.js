@@ -20,6 +20,10 @@ export const productLinks = [
     'https://www.amazon.com/2022-Apple-MacBook-Laptop-chip/dp/B0B3BVWJ6Y',
     'https://www.amazon.com/Apple-2023-MacBook-Laptop-chip/dp/B0C7686169',
 
+    // --- ELECTRONICS: Accessories (frequent coupons) ---
+    'https://www.amazon.com/Anker-Portable-PowerCore-Capacity-Compatible/dp/B0C6XRXB5N',
+    'https://www.amazon.com/Anker-Charging-Foldable-Compatible-Included/dp/B09W2PNLX4',
+
     // --- SHOES ---
     'https://www.amazon.com/Nike-FB2207-Mens-Running-Shoe/dp/B0DHQ467TR',
     'https://www.amazon.com/Nike-Experience-Running-Trainers-Sneakers/dp/B0BLW6SVJ7',
@@ -40,6 +44,38 @@ export const productLinks = [
     // --- HOME PRODUCTS: Area Rugs ---
     'https://www.amazon.com/TOPRUUG-Washable-Oriental-Area-Rug/dp/B0CFY66MZG',
     'https://www.amazon.com/Homcomoda-Vintage-Washable-Non-Slip-Distressed/dp/B0CMXDSLVX',
+
+    // --- SUPPLEMENTS: Protein (very frequent coupons + limited deals) ---
+    'https://www.amazon.com/Optimum-Nutrition-Standard-Protein-Chocolate/dp/B000QSNYGI',
+    'https://www.amazon.com/MuscleTech-Nitro-Tech-Protein-Powder/dp/B0000X0Z14',
+    'https://www.amazon.com/Garden-Life-Organic-Protein-Chocolate/dp/B00J074W7Q',
+
+    // --- SUPPLEMENTS: Creatine (high coupon frequency) ---
+    'https://www.amazon.com/Optimum-Nutrition-Micronized-Creatine-Monohydrate/dp/B002DYIZEO',
+    'https://www.amazon.com/Nutricost-Creatine-Monohydrate-Micronized-Unflavored/dp/B01AVZVJVK',
+
+    // --- SUPPLEMENTS: Pre-Workout ---
+    'https://www.amazon.com/Cellucor-Workout-Supplement-Micronized-Creatine/dp/B09R86DVPX',
+    'https://www.amazon.com/Legion-Athletics-Pulse-Pre-Workout/dp/B01MS6WZPM',
+
+    // --- VITAMINS & HEALTH (very high coupon frequency on Amazon) ---
+    'https://www.amazon.com/Vitamin-Supplement-Supports-Immune-System/dp/B07BJ9HW22',
+    'https://www.amazon.com/NatureWise-Vitamin-Organic-Extra-Strength/dp/B00GB85JR4',
+    'https://www.amazon.com/Nature-Made-Multivitamin-Complete-Softgels/dp/B01N9G4BZI',
+    'https://www.amazon.com/Centrum-Multivitamin-Multimineral-Supplement-Nutrients/dp/B09H86MVFM',
+    'https://www.amazon.com/Fish-Oil-1000mg-Burpless-Softgels/dp/B001LF39S8',
+    'https://www.amazon.com/NOW-Supplements-CoQ10-600-Softgels/dp/B0013OQHAE',
+
+    // --- BABY PRODUCTS (consistently heavy coupon rotation) ---
+    'https://www.amazon.com/Pampers-Sensitive-Water-Based-Unscented-Hypoallergenic/dp/B07MFMFZ5J',
+    'https://www.amazon.com/Huggies-Natural-Unscented-Hypoallergenic-Packaging/dp/B09NW4WT9C',
+    'https://www.amazon.com/Pampers-Swaddlers-Newborn-Diapers-Count/dp/B07MKJXPNN',
+
+    // --- PET SUPPLIES (high coupon frequency) ---
+    'https://www.amazon.com/Royal-Canin-Feline-Health-Nutrition/dp/B00CDLX19O',
+    'https://www.amazon.com/Blue-Buffalo-Wilderness-Natural-Protein/dp/B00N5HFPP6',
+    'https://www.amazon.com/Purina-Pro-Plan-Adult-Shredded/dp/B01N0UITBZ',
+    'https://www.amazon.com/Milk-Bone-Original-Dog-Treats/dp/B0002AR0I8',
 
     // --- MEN'S HAIR ---
     'https://www.amazon.com/Nizoral-Anti-Dandruff-Shampoo-Ketoconazole-Dandruff/dp/B00AINMFAC',

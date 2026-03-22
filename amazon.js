@@ -191,6 +191,15 @@ export async function Monitor(productLink) {
             isAvailable = !!addToCartBtn;
           }
 
+          // --- Limited stock detection ---
+          // "Only 3 left in stock — order soon" is a major urgency signal.
+          // If stock is low AND there's a deal, we bypass the cooldown so subscribers
+          // get the alert before it sells out.
+          const availabilityFullText = root.querySelector('#availability')?.textContent?.trim() || '';
+          const limitedStockMatch    = availabilityFullText.match(/only\s+(\d+)\s+left/i);
+          const stockCount           = limitedStockMatch ? parseInt(limitedStockMatch[1]) : null;
+          const isLimitedStock       = stockCount !== null && stockCount <= 10;
+
           if (!isAvailable) {
             console.log(`${productName}: OUT OF STOCK`);
           } else {
@@ -231,12 +240,30 @@ export async function Monitor(productLink) {
               root.querySelector('[id*="deal-badge"]')
             );
 
-            // --- Coupon ---
+            // --- Coupon — wide net of selectors + page-text fallback ---
+            // Amazon renders coupon badges server-side but uses many different IDs/classes.
+            // If all element selectors miss, scan the full page text for "Apply X% coupon" patterns.
             const coupon = extractCouponText(root.querySelector('#couponText'))
                         || extractCouponText(root.querySelector('#couponBadgeID'))
                         || extractCouponText(root.querySelector('.couponBadgeRegularVpc'))
                         || extractCouponText(root.querySelector('#vpcButton span'))
                         || extractCouponText(root.querySelector('[data-feature-name="couponButton"] span'))
+                        || extractCouponText(root.querySelector('[data-feature-name="coupon"] span'))
+                        || extractCouponText(root.querySelector('#couponFeatureBadge'))
+                        || extractCouponText(root.querySelector('.couponFeature'))
+                        || extractCouponText(root.querySelector('[id*="coupon"] span'))
+                        || (() => {
+                             // Broad fallback: scan page for coupon text patterns
+                             const pageText = root.querySelector('#ppd')?.textContent
+                                           || root.querySelector('#dp')?.textContent
+                                           || '';
+                             const m = pageText.match(
+                               /(?:apply|clip|save|get)\s+(\$[\d.]+|\d+%)\s+(?:with\s+)?(?:this\s+)?coupon/i
+                             ) || pageText.match(
+                               /(\d+%\s+off|save\s+\$[\d.]+)\s+with\s+(?:this\s+)?coupon/i
+                             );
+                             return m ? m[0].replace(/\s+/g, ' ').trim() : null;
+                           })()
                         || null;
 
             // --- Price drop detection via persisted history ---
@@ -259,21 +286,31 @@ export async function Monitor(productLink) {
             }
 
             // --- Is this a real deal worth notifying? ---
-            // Only alert when: coupon present, lightning deal, savings >= 15%, or price dropped >= 15%
+            // Only alert when: coupon present, lightning deal, savings >= 15%, price dropped >= 15%,
+            // or limited stock alongside any discount (urgency even at lower savings %)
             const effectiveSavingsPct = savingsPct ?? priceDropPct ?? 0;
-            const isDeal = coupon || isLightningDeal || effectiveSavingsPct >= MIN_SAVINGS_PCT;
+            const isDeal = coupon
+                        || isLightningDeal
+                        || effectiveSavingsPct >= MIN_SAVINGS_PCT
+                        || (isLimitedStock && effectiveSavingsPct > 0);
 
             // --- Deal type label and embed color ---
             let dealLabel, embedColor;
             if (isLightningDeal) {
               dealLabel  = '⚡ Lightning Deal';
               embedColor = '#FF4500';
+            } else if (coupon && isLimitedStock) {
+              dealLabel  = '🎟️🔥 Coupon + Low Stock';
+              embedColor = '#FF0000'; // red — urgent
             } else if (coupon) {
               dealLabel  = '🎟️ Coupon Deal';
               embedColor = '#FFD700';
             } else if (priceDrop) {
               dealLabel  = '📉 Price Drop';
               embedColor = '#1E90FF';
+            } else if (isLimitedStock && effectiveSavingsPct > 0) {
+              dealLabel  = '⚠️ Low Stock Deal';
+              embedColor = '#FFA500';
             } else if (effectiveSavingsPct >= MIN_SAVINGS_PCT) {
               dealLabel  = '🔥 Big Discount';
               embedColor = '#FF6347';
@@ -282,12 +319,11 @@ export async function Monitor(productLink) {
               embedColor = '#90ee90';
             }
 
-            const logLine = `${productName} [${sku}]: IN STOCK | ${price}`
+            const logLine = `${productName} [${sku}]: IN STOCK${isLimitedStock ? ` (only ${stockCount} left!)` : ''} | ${price}`
               + (originalPrice   ? ` (reg ${originalPrice})` : '')
-              + (savingsText     ? ` | ${savingsText} off`   : '')
+              + (savingsText     ? ` | ${savingsText}`       : '')
               + (coupon          ? ` | Coupon: ${coupon}`    : '')
-              + (isLightningDeal ? ` | LIGHTNING DEAL`       : '')
-              + (priceDrop       ? ` | DROP ${priceDrop.from} → ${priceDrop.to}` : '');
+              + (isLightningDeal ? ` | LIGHTNING DEAL`       : '');
             console.log(logLine);
 
             if (!isDeal) {
@@ -299,7 +335,8 @@ export async function Monitor(productLink) {
 
               const stockCooldownPassed  = currentTime - lastStockNotif  >= notificationCooldown;
               const couponCooldownPassed = currentTime - lastCouponNotif >= couponNotificationCooldown;
-              const shouldNotify = coupon ? couponCooldownPassed : stockCooldownPassed;
+              // Limited stock always bypasses cooldown — subscribers must know before it's gone
+              const shouldNotify = isLimitedStock || (coupon ? couponCooldownPassed : stockCooldownPassed);
 
               if (shouldNotify) {
                 // Title styled like: "🔥 73% OFF! Sony WH-1000XM5 Headphones"
@@ -321,10 +358,11 @@ export async function Monitor(productLink) {
                   .addField('💰 Price', priceDisplay, true)
                   .addField('📦 ASIN', sku, true);
 
+                if (isLimitedStock)               embed.addField('🚨 Stock Warning', `Only **${stockCount}** left — act fast!`, false);
                 if (priceDrop)                    embed.addField('📉 Price Drop', `~~${priceDrop.from}~~ → **${priceDrop.to}** (${priceDrop.pct}% off)`, false);
-                if (savingsText && !priceDrop)     embed.addField('💸 Savings', savingsText, true);
-                if (coupon)                        embed.addField('🎟️ Use Code at Checkout', `\`${coupon}\``, false);
-                if (isLightningDeal)               embed.addField('⚡ Lightning Deal', 'Limited time — act fast!', false);
+                if (savingsText && !priceDrop)    embed.addField('💸 Savings', savingsText, true);
+                if (coupon)                       embed.addField('🎟️ Use Code at Checkout', `\`${coupon}\``, false);
+                if (isLightningDeal)              embed.addField('⚡ Lightning Deal', 'Limited time — act fast!', false);
 
                 embed.addField('🔗 Buy Now', productLink, false);
 
